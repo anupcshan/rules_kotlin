@@ -112,8 +112,8 @@ def _build_resourcejar_action(ctx):
     return resources_jar_output
 
 # MAIN ACTIONS #########################################################################################################
-def _declare_output_directory(ctx, aspect, dir_name):
-    return ctx.actions.declare_directory("_kotlinc/%s_%s/%s_%s" % (ctx.label.name, aspect, ctx.label.name, dir_name))
+def _throwaway_output_directory(ctx, aspect, dir_name):
+    return "%s/%s/%s/_kotlinc/%s_%s/%s_%s" % (ctx.configuration.genfiles_dir.path, ctx.label.workspace_root, ctx.label.package, ctx.label.name, aspect, ctx.label.name, dir_name)
 
 def _partition_srcs(srcs):
     """Partition sources for the jvm aspect."""
@@ -158,7 +158,7 @@ def kt_jvm_compile_action(ctx, rule_kind, output_jar):
     # TODO extract and move this into common. Need to make it generic first.
     friends = getattr(ctx.attr, "friends", [])
     deps = [d[JavaInfo] for d in friends + ctx.attr.deps] + [toolchain.jvm_stdlibs]
-    compile_jars = java_common.merge(deps).compile_jars
+    compile_jars = java_common.merge(deps).transitive_compile_time_jars
 
     if len(friends) == 0:
         module_name = _utils.derive_module_name(ctx)
@@ -174,10 +174,10 @@ def kt_jvm_compile_action(ctx, rule_kind, output_jar):
     else:
         fail("only one friend is possible")
 
-    classes_directory = _declare_output_directory(ctx, "jvm", "classes")
-    generated_classes_directory = _declare_output_directory(ctx, "jvm", "generated_classes")
-    sourcegen_directory = _declare_output_directory(ctx, "jvm", "sourcegenfiles")
-    temp_directory = _declare_output_directory(ctx, "jvm", "temp")
+    classes_directory = _throwaway_output_directory(ctx, "jvm", "classes")
+    generated_classes_directory = _throwaway_output_directory(ctx, "jvm", "generated_classes")
+    sourcegen_directory = _throwaway_output_directory(ctx, "jvm", "sourcegenfiles")
+    temp_directory = _throwaway_output_directory(ctx, "jvm", "temp")
 
     args = _utils.init_args(ctx, rule_kind, module_name)
 
@@ -199,7 +199,9 @@ def kt_jvm_compile_action(ctx, rule_kind, output_jar):
     # Collect and prepare plugin descriptor for the worker.
     plugin_info = _merge_plugin_infos(ctx.attr.plugins + ctx.attr.deps)
     if len(plugin_info.annotation_processors) > 0:
-        args.add("--kotlin_plugins", plugin_info.to_json())
+        to_serialize = struct(annotation_processors=plugin_info.annotation_processors)
+        args.add("--kotlin_plugins", to_serialize.to_json())
+        compile_jars += plugin_info.transitive_runtime_jars
 
     progress_message = "Compiling Kotlin to JVM %s { kt: %d, java: %d, srcjars: %d }" % (
         ctx.label,
@@ -216,12 +218,9 @@ def kt_jvm_compile_action(ctx, rule_kind, output_jar):
             output_jar,
             ctx.outputs.jdeps,
             ctx.outputs.srcjar,
-            sourcegen_directory,
-            classes_directory,
-            temp_directory,
-            generated_classes_directory,
         ],
         executable = toolchain.kotlinbuilder.files_to_run.executable,
+        use_default_shell_env = True,
         execution_requirements = {"supports-workers": "1"},
         arguments = [args],
         progress_message = progress_message,

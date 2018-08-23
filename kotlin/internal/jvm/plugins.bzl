@@ -20,10 +20,11 @@ KtJvmPluginInfo = provider(
     doc = "This provider contains the plugin info for the JVM aspect",
     fields = {
         "annotation_processors": "a serializeable list of structs containing annotation processor definitions",
+        "transitive_runtime_jars": "set of jars required during annotation processor execution",
     },
 )
 
-_EMPTY_PLUGIN_INFO = [KtJvmPluginInfo(annotation_processors = [])]
+_EMPTY_PLUGIN_INFO = [KtJvmPluginInfo(annotation_processors = [], transitive_runtime_jars = depset())]
 
 def merge_plugin_infos(attrs):
     """Merge all of the plugin infos found in the provided sequence of attributes.
@@ -31,13 +32,16 @@ def merge_plugin_infos(attrs):
         A KtJvmPluginInfo provider, Each of the entries is serializable."""
     tally = {}
     annotation_processors = []
+    runtime_jars = depset()
     for info in [a[KtJvmPluginInfo] for a in attrs]:
         for p in info.annotation_processors:
             if p.label not in tally:
                 tally[p.label] = True
                 annotation_processors.append(p)
+        runtime_jars += info.transitive_runtime_jars
     return KtJvmPluginInfo(
         annotation_processors = annotation_processors,
+        transitive_runtime_jars = runtime_jars,
     )
 
 def _kt_jvm_plugin_aspect_impl(target, ctx):
@@ -53,6 +57,7 @@ def _kt_jvm_plugin_aspect_impl(target, ctx):
                     generates_api = processor.generates_api,
                 ),
             ],
+            transitive_runtime_jars = merged_deps.transitive_runtime_jars,
         )]
     elif ctx.rule.kind == "java_library":
         return [merge_plugin_infos(ctx.rule.attr.exported_plugins)]

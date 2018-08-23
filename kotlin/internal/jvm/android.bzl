@@ -16,7 +16,7 @@ load(
     _kt_jvm_library = "kt_jvm_library",
 )
 
-def _kt_android_artifact(name, srcs = [], deps = [], plugins = [], **kwargs):
+def _kt_android_artifact(name, srcs = [], deps = [], plugins = [], android_deps = [], **kwargs):
     """Delegates Android related build attributes to the native rules but uses the Kotlin builder to compile Java and
     Kotlin srcs. Returns a sequence of labels that a wrapping macro should export.
     """
@@ -26,23 +26,25 @@ def _kt_android_artifact(name, srcs = [], deps = [], plugins = [], **kwargs):
     native.android_library(
         name = base_name,
         visibility = ["//visibility:private"],
+        deps = android_deps,
         **kwargs
     )
+
     _kt_jvm_library(
         name = kt_name,
         srcs = srcs,
-        deps = deps + ["@io_bazel_rules_kotlin//kotlin/internal/jvm:android_sdk", base_name],
+        deps = deps + android_deps + ["@io_bazel_rules_kotlin//kotlin/internal/jvm:android_sdk", base_name],
         plugins = plugins,
         visibility = ["//visibility:private"],
     )
     return [base_name, kt_name]
 
-def kt_android_library(name, exports = [], visibility = None, **kwargs):
+def kt_android_library(name, exports = [], visibility = None, android_deps = [], **kwargs):
     """Creates an Android sandwich library. `srcs`, `deps`, `plugins` are routed to `kt_jvm_library` the other android
     related attributes are handled by the native `android_library` rule.
     """
     native.android_library(
         name = name,
-        exports = exports + _kt_android_artifact(name, **kwargs),
+        exports = exports + _kt_android_artifact(name, android_deps = android_deps, **kwargs),
         visibility = visibility,
     )
