@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KOTLIN_CURRENT_RELEASE = "1.2.60"
+KOTLIN_CURRENT_RELEASE = "1.2.71"
 
 KOTLIN_COMPILER_RELEASES = {
+    "1.2.71": {
+        "version": "1.2.71",
+        "url": "https://github.com/JetBrains/kotlin/releases/download/v1.2.71/kotlin-compiler-1.2.71.zip",
+        "sha256": "e48292fdfed42f44230bc01f92ffd17002101d8c5aeedfa3dba3cb29c5b6ea7b",
+    },
     "1.2.60": {
         "version": "1.2.60",
         "url": "https://github.com/JetBrains/kotlin/releases/download/v1.2.60/kotlin-compiler-1.2.60.zip",
